@@ -45,7 +45,7 @@ def heading():
     '\n' + '{0}Kick Devices Off Your LAN ({1}KickThemOut{2}){3}'.format(YELLOW, RED, YELLOW, BLUE).center(98) +
     '\n' + 'Made With <3 by: {0}Nikolaos Kamarinakis ({1}k4m4{2}) & {0}David Schütz ({1}xdavidhu{2}){3}'.format(
         YELLOW, RED, YELLOW, BLUE).center(111) +
-    '\n' + 'Version: {0}0.1{1}\n'.format(YELLOW, END).center(86))
+    '\n' + 'Version: {0}0.2{1}\n'.format(YELLOW, END).center(86))
 
 def optionBanner():
     print('\nChoose option from menu:\n')
@@ -72,12 +72,7 @@ def scanNetwork():
     hostsList = scan.scanNetwork()
     regenOnlineIPs()
 
-def kickoneoff():
-    os.system("clear||cls")
-
-    print("\n{0}kickONEOff{1} selected...{2}\n").format(RED, GREEN, END)
-    scanNetwork()
-
+def print_online_ips():
     print("Online IPs: ")
     for i in range(len(onlineIPs)):
         mac = ""
@@ -85,7 +80,16 @@ def kickoneoff():
             if host[0] == onlineIPs[i]:
                 mac = host[1]
         vendor = resolveMac(mac)
-        print("  [{0}" + str(i) + "{1}] {2}" + str(onlineIPs[i]) + "{3}\t"+ vendor + "{4}").format(YELLOW, WHITE, RED, GREEN, END)
+        comp_name = " ("+get_apple_name(onlineIPs[i])+")" if vendor == "Apple, Inc." else ""
+        print("  [{0}" + str(i) + "{1}] {2:5}" + str(onlineIPs[i]) + "{3:6}\t"+ vendor + "{4}"+comp_name).format(YELLOW, WHITE, RED, GREEN, END)
+
+def kickoneoff():
+    os.system("clear||cls")
+
+    print("\n{0}kickONEOff{1} selected...{2}\n").format(RED, GREEN, END)
+    scanNetwork()
+
+    print_online_ips()
 
     canBreak = False
     while not canBreak:
@@ -128,16 +132,9 @@ def kicksomeoff():
 
     print("\n{0}kickSOMEOff{1} selected...{2}\n").format(RED, GREEN, END)
     scanNetwork()
-
-    print("Online IPs: ")
-    for i in range(len(onlineIPs)):
-        mac = ""
-        for host in hostsList:
-            if host[0] == onlineIPs[i]:
-                mac = host[1]
-        vendor = resolveMac(mac)
-        print("  [{0}" + str(i) + "{1}] {2}" + str(onlineIPs[i]) + "{3}\t" + vendor + "{4}").format(YELLOW, WHITE, RED, GREEN, END)
-
+    
+    print_online_ips()
+   
     canBreak = False
     while not canBreak:
         try:
@@ -162,7 +159,6 @@ def kicksomeoff():
     some_ipList = some_ipList[:-2] + END
 
     print("\n{0}Targets: {1}" + some_ipList).format(GREEN, END)
-
     print("\n{0}Spoofing started... {1}").format(GREEN, END)
     try:
         while True:
@@ -191,14 +187,7 @@ def kickalloff():
     print("\n{0}kickALLOff{1} selected...{2}\n").format(RED, GREEN, END)
     scanNetwork()
 
-    print("Online IPs: ")
-    for i in range(len(onlineIPs)):
-        mac = ""
-        for host in hostsList:
-            if host[0] == onlineIPs[i]:
-                mac = host[1]
-        vendor = resolveMac(mac)
-        print(str("  {0}"+ str(onlineIPs[i]) + "{1}\t" + vendor + "{2}").format(RED, GREEN, END))
+    print_online_ips()
 
     print("\n{0}Spoofing started... {1}").format(GREEN, END)
     try:
@@ -266,6 +255,10 @@ def getDefaultInterfaceMAC():
         defaultInterfaceMac = raw_input(header)
 	return defaultInterfaceMac
 
+def get_apple_name(ip):
+    name, err = subprocess.Popen("dig +short -x %s @224.0.0.251 -p 5353" % ip, shell=True, stdout=subprocess.PIPE).communicate()
+    return name.strip()
+
 def resolveMac(mac):
     try:
         url = "http://macvendors.co/api/vendorname/"
@@ -282,10 +275,8 @@ def main():
 
     heading()
 
-    print(
-        "\n{0}Using interface '{1}" + defaultInterface + "{2}' with mac address '{3}" + defaultInterfaceMac + "{4}'.\nGateway IP: '{5}"
-        + defaultGatewayIP + "{6}' --> {7}" + str(len(hostsList)) + "{8} hosts are up.{9}").format(GREEN, RED, GREEN, RED, GREEN, 
-                                                                                                RED, GREEN, RED, GREEN, END)
+    print("\n{0}Using interface '{1}" + defaultInterface + "{2}' with mac address '{3}" + defaultInterfaceMac + "{4}'.\nGateway IP: '{5}"
+        + defaultGatewayIP + "{6}' --> {7}" + str(len(hostsList)) + "{8} hosts are up.{9}").format(GREEN, RED, GREEN, RED, GREEN, RED, GREEN, RED, GREEN, END)
 
     if len(hostsList) == 0 or len(hostsList) == 1:
         if len(hostsList) == 1:
