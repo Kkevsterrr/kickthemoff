@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-# -.- coding: utf-8 -.-
 # scan.py 
 # author: Benedikt Waldvogel (MIT Licensed)
-# edited by: k4m4 & xdavidhu
+# edited by: k4m4, xdavidhu, kkevsterrr
 
 import logging
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -48,7 +47,7 @@ def scanNetwork():
     for network, netmask, _, interface, address in scapy.config.conf.route.routes:
 
         # skip loopback network and default gw
-        if network == 0 or interface == 'lo' or address == '127.0.0.1' or address == '0.0.0.0':
+        if network == 0 or "lo" in interface or address == '127.0.0.1' or address == '0.0.0.0':
             continue
 
         if netmask <= 0 or netmask == 0xFFFFFFFF:
