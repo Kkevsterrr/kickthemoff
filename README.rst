@@ -1,7 +1,7 @@
-KickThemOut
+KickThemOff
 ============
 
-`KickThemOut <https://nikolaskama.me/kickthemoutproject/>`_ - **Kick Devices Off Your Network**
+`KickThemOff <https://nikolaskama.me/kickthemoutproject/>`_ - **Kick Devices Off Your Network**
 
 A tool to kick devices out of your network and enjoy all the bandwidth for yourself.
 It allows you to select specific or all devices and ARP spoofs them off your local area network.
@@ -15,7 +15,7 @@ Authors: `Nikolaos Kamarinakis <mailto:nikolaskam@gmail.com>`_  & `David Schütz
 Installation
 -------------
 
-You can download KickThemOut by cloning the `Git Repo <https://github.com/k4m4/kickthemout>`_ and simply installing its requirements::
+You can download KickThemOff by cloning the `Git Repo <https://github.com/k4m4/kickthemout>`_ and simply installing its requirements::
 
     $ git clone https://github.com/k4m4/kickthemout.git
     
@@ -26,7 +26,7 @@ You can download KickThemOut by cloning the `Git Repo <https://github.com/k4m4/k
 Mac OS X Installation
 ----------------------
 
-If you would like to install KickThemOut on a Mac, please run the following::
+If you would like to install KickThemOff on a Mac, please run the following::
 
     $ sudo pip install pcapy
     
@@ -51,7 +51,7 @@ Here's a short demo:
 Disclaimer
 -----------
 
-KickThemOut is provided as is under the MIT Licence (as stated below). 
+KickThemOff is provided as is under the MIT Licence (as stated below). 
 It is built for educational purposes only. If you choose to use it otherwise, the developers will not be held responsible. 
 In brief, do not use it with evil intent.
 
@@ -60,7 +60,7 @@ License
 
 Copyright (c) 2017 by `Nikolaos Kamarinakis <mailto:nikolaskam@gmail.com>`_ & `David Schütz <mailto:xdavid@protonmail.com>`_. Some rights reserved.
 
-KickThemOut is under the terms of the `MIT License <https://www.tldrlegal.com/l/mit>`_, following all clarifications stated in the `license file <https://raw.githubusercontent.com/k4m4/kickthemout/master/LICENSE>`_.
+KickThemOff is under the terms of the `MIT License <https://www.tldrlegal.com/l/mit>`_, following all clarifications stated in the `license file <https://raw.githubusercontent.com/k4m4/kickthemout/master/LICENSE>`_.
 
 
 For more information head over to the `official project page <https://nikolaskama.me/kickthemoutproject/>`_.
